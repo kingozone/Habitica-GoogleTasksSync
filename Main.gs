@@ -1,59 +1,39 @@
-// Globals
-const scriptProperties = PropertiesService.getScriptProperties();
+function getTodosFromHabitica() {
+  // Access Habitica API credentials from script properties
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const userID = scriptProperties.getProperty("habitica_userid");
+  const apiKey = scriptProperties.getProperty("habitica_apikey");
+  const apiUrl = scriptProperties.getProperty("habitica_apiurl") + "tasks/user?type=todos";
 
-function main() {
-  // Initialize the data
-  getGTasks();
-  getTodosFromHabitica();
-
-  // Get tasks from GTasks
-  let [gtasksCompletedIDs, gtasksIncompleteIDs] = getGTasksId();
-
-  // Get todos from Habitica. This entire list only contains incomplete tasks
-  let habiticaTodoAliases = getHabiticaTodoAliases();
-
-  // Copy incomplete tasks from GTasks to Habitica
-  //      If the GTask ID is not in the list of Habitica aliases
-  //      Add it to Habitica
-
-  let incompleteGTaskIDsToCopy = gtasksIncompleteIDs.filter(x => !habiticaTodoAliases.includes(x));
-
-  for(let t of incompleteGTaskIDsToCopy){
-    addGTaskToHabitica(t);
+  if (!userID || !apiKey) {
+    throw new Error("Habitica credentials (user ID and API key) are missing or misconfigured in script properties.");
   }
 
-  // Mark all completed tasks as done
-  let completeGTaskIDsToMarkAsDone = gtasksCompletedIDs.filter(x => habiticaTodoAliases.includes(x));
+  // Set up request headers for Habitica API
+  const headers = {
+    "x-api-user": userID,
+    "x-api-key": apiKey
+  };
 
-  for(let t of completeGTaskIDsToMarkAsDone){
-    markGTaskAsDone(t);
-  }
+  const options = {
+    method: "get",
+    headers: headers
+  };
 
-  // Update changes in due date
+  try {
+    // Fetch the todos from Habitica
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const json = JSON.parse(response.getContentText());
 
-  //    Find GTasks that are in Habitica
-  let incompleteGTaskIDsInHabitica = gtasksIncompleteIDs.filter(x => habiticaTodoAliases.includes(x));
-  
-  //    Find any mismatch in due dates
-  for (let t of incompleteGTaskIDsInHabitica){
-    let habiticaTodo = getHabiticaTodoFromAlias(t);
-    let gtask = getGTaskFromId(t);
-
-    if (gtask.dueDate === undefined){
-      // pass
+    if (json.success) {
+      console.log("Fetched Habitica todos successfully.");
+      return json.data; // Habitica todos are in the `data` property
     } else {
-      
-      let gtaskDueDate = new Date(gtask.dueDate);
-      let habiticaDueDate = new Date(habiticaTodo.dueDate);
-
-      if (gtaskDueDate.valueOf() === habiticaDueDate.valueOf()){
-        // pass
-      } else {
-        buildRequest("put", "tasks/" + habiticaTodo.id, {"date": gtask.dueDate});
-      }
+      console.error("Error fetching Habitica todos:", json);
+      throw new Error("Failed to fetch Habitica todos. Check API settings.");
     }
-
+  } catch (error) {
+    console.error("Error in getTodosFromHabitica:", error.message);
+    throw error;
   }
-
 }
-

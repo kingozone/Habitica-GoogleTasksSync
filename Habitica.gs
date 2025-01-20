@@ -1,56 +1,34 @@
-function getTagNameFromId(tagId){
-  for (let t of habiticaTags){
-    if (t.tagId === tagId){
-      return t.tagName;
+function fetchHabiticaTags() {
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const userID = scriptProperties.getProperty("habitica_userid");
+    const apiKey = scriptProperties.getProperty("habitica_apikey");
+    const apiUrl = "https://habitica.com/api/v3/tags"; 
+
+    if (!userID || !apiKey) {
+        console.error("Habitica credentials are missing.");
+        return [];
     }
-  }
 
-  return "";
-}
+    const options = {
+        method: "get",
+        headers: {
+            "x-api-user": userID,
+            "x-api-key": apiKey
+        }
+    };
 
-function getTagIdFromName(tagName){
-  for (let t of habiticaTags){
-    if (t.tagName === tagName){
-      return t.tagName;
+    try {
+        const response = UrlFetchApp.fetch(apiUrl, options);
+        const json = JSON.parse(response.getContentText());
+        if (json.success) {
+            console.log("Fetched tags:", json.data);
+            return Array.isArray(json.data) ? json.data : []; // Ensure it's an array
+        } else {
+            console.error("Error fetching Habitica tags:", json);
+            return [];  // Return an empty array on error
+        }
+    } catch (error) {
+        console.error("Error occurred while fetching Habitica tags:", error.message);
+        return [];  // Return an empty array on exception
     }
-  }
-
-  return "";
-}
-
-function getHabiticaTodoAliases(){
-  var aliasList = [];
-  for (let t of habiticaTodos){
-    if (t.alias === undefined){
-      // pass
-    } else {
-      aliasList.push(t.alias);
-    }
-  }
-
-  return aliasList;
-}
-
-function getHabiticaTodoFromAlias(alias){
-  for (let t of habiticaTodos){
-    if (t.alias === alias){
-      return t;
-    }
-  }
-
-  return "";
-}
-
-function addGTaskToHabitica(gtaskId){
-  var gtask = getGTaskFromId(gtaskId);
-  buildRequest("post", "tasks/user", gtask.convertToHabiticaPayload());
-}
-
-function markGTaskAsDone(gtaskId){
-  var habiticaTodo = getHabiticaTodoFromAlias(gtaskId);
-  buildRequest("post", "tasks/" + habiticaTodo.id + "/score/up", {"up": "True"});
-}
-
-function updateGTaskDueDate(gtask){
-
 }
